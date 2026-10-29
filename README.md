@@ -3,96 +3,110 @@
 [![Rust](https://img.shields.io/badge/Language-Rust_2021-orange?logo=rust)](https://www.rust-lang.org/)
 [![UI](https://img.shields.io/badge/TUI-Ratatui_0.29-blueviolet)](https://ratatui.rs/)
 [![Neovim](https://img.shields.io/badge/Editor-Neovim_%2F_LazyVim-57A143?logo=neovim)](https://www.lazyvim.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-Ein schnelles, deterministisches Terminal-User-Interface (**TUI**) in **Rust** (mit [`ratatui`](https://ratatui.rs/) & [`crossterm`](https://github.com/crossterm-rs/crossterm)), mit dem du lokal installierte **LazyVim / Neovim Themes** sowie die beliebtesten Themes von **[dotfyle.com/neovim/colorscheme/top](https://dotfyle.com/neovim/colorscheme/top)** live im Terminal betrachten, testen und **100 % ausfallsicher** aktivieren kannst.
+A fast, deterministic Terminal User Interface (**TUI**) written in **Rust** (powered by [`ratatui`](https://ratatui.rs/) & [`crossterm`](https://github.com/crossterm-rs/crossterm)) for browsing, live-previewing, and **safely switching** local **LazyVim / Neovim** colorschemes alongside the most popular community themes from **[dotfyle.com/neovim/colorscheme/top](https://dotfyle.com/neovim/colorscheme/top)**.
 
 ---
 
 ## ✨ Features
 
-- **🔍 Lokaler & Cloud-Katalog:**
-  - Erkennt automatisch alle bereits in `~/.local/share/nvim/lazy/` installierten Themes (inkl. eigener lokaler Plugins).
-  - Enthält die Top-Colorschemes von **[Dotfyle](https://dotfyle.com/neovim/colorscheme/top)** (u. a. *Catppuccin Mocha/Macchiato/Frappé/Latte*, *TokyoNight Night/Moon/Storm*, *Kanagawa Wave/Dragon*, *Rosé Pine*, *Gruvbox*, *Nightfox/Carbonfox/Nordfox*, *OneDark Pro*, *Everforest*, *Cyberdream*, *GitHub Dark*, *Dracula*).
-- **🌈 Echte 24-Bit TrueColor Live-Code-Vorschau:**
-  - Zeigt rechts neben der Auswahlliste sofort ein vollständig eingefärbtes Code-Snippet (Hintergrund, Keywords, Funktionen, Strings, Hardware-Register, Datentypen, Cursor-Zeile, Zeilennummern & simulierte `lualine`-Statusbar) sowie die 10-teilige Farbpalette als Swatches.
-  - Unterstützt Live-Umschaltung der Vorschau-Programmiersprache (**Embedded AVR C**, **Rust**, **Python**, **C++20**) per Taste `l`.
-- **🛡️ Zero-Breakage-Garantie für Neovim:**
-  - Schreibt ausschließlich in `~/.config/nvim/lua/plugins/colorscheme.lua`.
-  - Legt vor jeder Änderung automatisch ein Backup (`~/.config/nvim/lua/plugins/colorscheme.lua.bak`) an (jederzeit per Taste `r` wiederherstellbar).
-  - Lädt noch nicht installierte Dotfyle-Themes **vor** dem Umschalten per `git clone --depth 1` nach `~/.local/share/nvim/lazy/` herunter.
-  - Schützt den Neovim-Start durch einen `pcall(vim.cmd.colorscheme, ...)`-Wrapper mit automatischem Fallback auf `tokyonight`, sodass Neovim selbst im Fehlerfall niemals mit einer Fehlermeldung startet.
+- **🔍 Unified Local & Cloud Catalog:**
+  - Automatically scans `~/.local/share/nvim/lazy/` to discover all currently installed Neovim theme plugins.
+  - Ships with a curated catalog of the top Neovim colorschemes from **[Dotfyle](https://dotfyle.com/neovim/colorscheme/top)** (including *Catppuccin Mocha/Macchiato/Frappé/Latte*, *TokyoNight Night/Moon/Storm*, *Kanagawa Wave/Dragon*, *Rosé Pine*, *Gruvbox*, *Nightfox/Carbonfox/Nordfox*, *OneDark Pro*, *Everforest*, *Cyberdream*, *GitHub Dark*, and *Dracula*).
+- **🌈 Live 24-Bit TrueColor Code Preview:**
+  - Renders a real-time syntax-highlighted code snippet right next to the theme selector using the exact 24-bit RGB palette of the highlighted theme (background, keywords, functions, strings, hardware registers/macros, types, active cursorline, line numbers, and a simulated `lualine` status bar) plus 10 color swatches.
+  - Press `l` to cycle the live preview snippet across **Embedded AVR C**, **Rust**, **Python**, and **C++20**.
+- **🛡️ Zero-Breakage Guarantee for Neovim:**
+  - Writes exclusively to an isolated plugin file: `~/.config/nvim/lua/plugins/colorscheme.lua`.
+  - Automatically creates a backup (`~/.config/nvim/lua/plugins/colorscheme.lua.bak`) before every change, which can be restored at any time by pressing `r`.
+  - Pre-clones missing Dotfyle themes via `git clone --depth 1` into `~/.local/share/nvim/lazy/` **before** updating the configuration.
+  - Wraps the colorscheme activation in a `pcall(vim.cmd.colorscheme, ...)` guard with an automatic fallback to `tokyonight`, ensuring Neovim never starts with an error.
 
 ---
 
-## 🖥️ TUI-Layout
+## 🖥️ TUI Layout
 
 ```text
-┌─ Neovim / LazyVim ─────────────────────────┐┌─ Filter [Tab / 1-3] ──────────────┐┌─ Suche [/] ──────────┐
-│ 🎨 LazyVim Theme Studio │ Aktiv: catppuccin ││ 1: Alle │ 2: Installiert │ 3: Top ││ 🔎 Drücke [/]...     │
+┌─ Neovim / LazyVim ─────────────────────────┐┌─ Filter [Tab / 1-3] ──────────────┐┌─ Search [/] ─────────┐
+│ 🎨 LazyVim Theme Studio │ Active: catppucc ││ 1: All  │ 2: Installed │ 3: Top   ││ 🔎 Press [/]...      │
 └────────────────────────────────────────────┘└───────────────────────────────────┘└──────────────────────┘
-┌─ Themes (21/21) — [↑/↓] Auswahl ───────────┐┌─ Live Code-Vorschau: Catppuccin Mocha │ Sprache [l]: AVR ─┐
-│ ▶ ★ AKTIV ☾ Catppuccin Mocha   [Dotfyle #1]││  1 // Microchip Studio 7.0.2594 — ATmega644 AD/DA Wandler │
-│   ✓ Inst. ☾ Catppuccin Macch.  [Dotfyle #1]││  2 #include <avr/io.h>                                    │
-│   ✓ Inst. ☾ TokyoNight Night   [Dotfyle #2]││  6 void adc_init(uint8_t channel) {                       │
-│   ↓ Cloud ☾ Kanagawa Wave      [Dotfyle #3]││  7     DDRA = 0xFF; // Port A als Ausgang                 │
-│   ↓ Cloud ☾ Rosé Pine          [Dotfyle #4]││  8     ADMUX = (1 << REFS0) | (channel & 0x07);           │
-│   ↓ Cloud ☾ Gruvbox Dark       [Dotfyle #5]││  NORMAL   main  󰘚 ATmega644 [Debug|AVR] │ utf-8 │ 7:18   │
+┌─ Themes (21/21) — [↑/↓] Select ────────────┐┌─ Live Code Preview: Catppuccin Mocha │ Lang [l]: AVR C ───┐
+│ ▶ ★ ACTIVE ☾ Catppuccin Mocha  [Dotfyle #1]││  1 // Microchip Studio 7.0.2594 — ATmega644 AD/DA         │
+│   ✓ Inst.  ☾ Catppuccin Macch. [Dotfyle #1]││  2 #include <avr/io.h>                                    │
+│   ✓ Inst.  ☾ TokyoNight Night  [Dotfyle #2]││  6 void adc_init(uint8_t channel) {                       │
+│   ↓ Cloud  ☾ Kanagawa Wave     [Dotfyle #3]││  7     DDRA = 0xFF; // Configure Port A as output         │
+│   ↓ Cloud  ☾ Rosé Pine         [Dotfyle #4]││  8     ADMUX = (1 << REFS0) | (channel & 0x07);           │
+│   ↓ Cloud  ☾ Gruvbox Dark      [Dotfyle #5]││  NORMAL   main  󰘚 ATmega644 [Debug|AVR] │ utf-8 │ 7:18   │
 ├────────────────────────────────────────────┤├───────────────────────────────────────────────────────────┤
 │ Colorscheme: catppuccin-mocha              ││  ███   ███   ███   ███   ███   ███   ███   ███   ███  ███ │
-│ Status: Lokal installiert                  ││  BG    FG    Keyw  Func  Str   Type  Macr  Num   Oper Com │
+│ Status: Installed locally                  ││  BG    FG    Keyw  Func  Str   Type  Macr  Num   Oper Com │
 └────────────────────────────────────────────┘└───────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## ⌨️ Tastenkürzel
+## ⌨️ Keybindings
 
-| Taste | Aktion |
+| Key | Action |
 | :--- | :--- |
-| **`↑` / `↓`** oder **`j` / `k`** | Durch die Themes navigieren (mit sofortiger Live-Vorschau) |
-| **`Enter`** oder **`a`** | Ausgewähltes Theme sicher herunterladen (falls nötig) & in LazyVim aktivieren |
-| **`Tab`** oder **`1` / `2` / `3`** | Filter wechseln: `1: Alle Themes` / `2: Installiert` / `3: Dotfyle Top` |
-| **`l`** | Programmiersprache im Live-Code-Beispiel wechseln (*AVR C* → *Rust* → *Python* → *C++*) |
-| **`/`** | Suchmodus starten (filtert nach Name, Repo oder Beschreibung) |
-| **`r`** | Rollback: Letztes Backup (`colorscheme.lua.bak`) oder LazyVim-Standard wiederherstellen |
-| **`?`** | Hilfe-Fenster ein-/ausblenden |
-| **`q`** oder **`Esc`** | Programm beenden |
+| **`↑` / `↓`** or **`j` / `k`** | Navigate through themes (updates the live code preview immediately) |
+| **`Enter`** or **`a`** | Safely download (if not yet installed) and activate the selected theme in LazyVim |
+| **`Tab`** or **`1` / `2` / `3`** | Switch filter tabs: `1: All Themes` / `2: Installed` / `3: Dotfyle Top` |
+| **`l`** | Cycle preview programming language (*Embedded AVR C* → *Rust* → *Python* → *C++20*) |
+| **`/`** | Start interactive search (filters by name, repository, or description) |
+| **`r`** | Rollback: Restore previous backup (`colorscheme.lua.bak`) or LazyVim default |
+| **`?`** | Toggle help modal |
+| **`q`** or **`Esc`** | Quit application |
 
 ---
 
-## 🚀 Installation & Ausführung
+## 🚀 Installation & Usage
 
-### Build aus dem Quellcode
+### Install via Cargo (from Crates.io or Git)
 ```bash
-cd /home/chris/Dokumente/Coding/rust/nvim-theme-tui
+# Install directly from GitHub:
+cargo install --git https://github.com/MakeMeFifi/nvim-thmepicker-tui.git
+
+# Or install from Crates.io (once published):
+cargo install nvim-theme-tui
+```
+
+### Build from Source
+```bash
+git clone https://github.com/MakeMeFifi/nvim-thmepicker-tui.git
+cd nvim-thmepicker-tui
 cargo build --release
 ```
 
-### Starten
+### Run
 ```bash
-# Direkt über den verlinkten Befehl im Terminal:
+# Launch interactive TUI:
 nvim-theme-tui
 
-# Oder über Cargo im Projektordner:
-cargo run --release
-
-# Nicht-interaktive Listenansicht im Terminal:
+# Non-interactive CLI list of all detected & Dotfyle themes:
 nvim-theme-tui --list
 ```
 
 ---
 
-## 📂 Projektstruktur
+## 📂 Project Structure
 
 ```text
 nvim-theme-tui/
-├── Cargo.toml       # Abhängigkeiten (ratatui, crossterm, anyhow)
-├── .gitignore       # Standard Rust & IDE Ignore-Regeln
-├── README.md        # Projektdokumentation
+├── Cargo.toml       # Package manifest & dependencies (ratatui, crossterm, anyhow)
+├── LICENSE          # GPL-3.0 License
+├── .gitignore       # Rust & IDE ignore rules
+├── README.md        # Documentation
 └── src/
-    ├── main.rs      # Terminal-Initialisierung, CLI-Argumente & Event-Loop
-    ├── app.rs       # State-Management, Suche, git-clone & sicherer Lua-Config-Generator
-    ├── themes.rs    # Kuratierter Dotfyle-Top-Katalog + 24-Bit-Paletten + lokaler LazyVim-Scanner
-    └── ui.rs        # Ratatui Split-Screen-Rendering, Code-Highlighter & Farb-Swatches
+    ├── main.rs      # Terminal initialization, CLI arguments & event loop
+    ├── app.rs       # State management, search, git-clone installer & safe Lua config writer
+    ├── themes.rs    # Curated Dotfyle Top catalog + 24-bit RGB palettes + local LazyVim scanner
+    └── ui.rs        # Ratatui split-screen renderer, syntax highlighter & palette swatches
 ```
+
+---
+
+## 📄 License
+
+This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](LICENSE) file for details.

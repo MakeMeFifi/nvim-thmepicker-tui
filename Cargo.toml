@@ -2,10 +2,12 @@
 name = "nvim-theme-tui"
 version = "0.1.0"
 edition = "2021"
-authors = ["Chris"]
+authors = ["MakeMeFifi <chrismikolajek2006@gmail.com>"]
 description = "Interactive Ratatui TUI for browsing, previewing, and safely switching LazyVim / Neovim colorschemes (Installed + Dotfyle Top)"
-license = "MIT"
+license = "GPL-3.0-only"
 readme = "README.md"
+repository = "https://github.com/MakeMeFifi/nvim-thmepicker-tui"
+homepage = "https://github.com/MakeMeFifi/nvim-thmepicker-tui"
 keywords = ["neovim", "lazyvim", "ratatui", "tui", "colorscheme"]
 categories = ["command-line-utilities", "development-tools"]
 
