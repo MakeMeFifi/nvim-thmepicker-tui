@@ -105,11 +105,11 @@ fn draw_top_bar(frame: &mut Frame, app: &App, area: Rect) {
         Color::DarkGray
     };
     let search_str = if app.is_searching {
-        format!(" / {}_", app.search_query)
+        format!(" / {}_ (Enter=Dotfyle)", app.search_query)
     } else if app.search_query.is_empty() {
-        " Press [/] to filter...".to_string()
+        " [/] Search (Enter=Dotfyle)".to_string()
     } else {
-        format!(" / {}", app.search_query)
+        format!(" / {} (Esc=Clear)", app.search_query)
     };
     let search = Paragraph::new(search_str)
         .style(Style::default().fg(if app.is_searching || !app.search_query.is_empty() {
@@ -143,7 +143,8 @@ fn draw_left_panel(frame: &mut Frame, app: &App, area: Rect) {
 
                 let rank_str = match t.dotfyle_rank {
                     Some(r) => format!("#{:02} ", r),
-                    None => "LOC ".to_string(),
+                    None if t.installed => "LOC ".to_string(),
+                    None => "WEB ".to_string(),
                 };
 
                 let status_badge = if is_active {
@@ -182,6 +183,17 @@ fn draw_left_panel(frame: &mut Frame, app: &App, area: Rect) {
                     "    [ + Load More (+10 from Dotfyle) ] ",
                     Style::default()
                         .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ])),
+            ListRow::SearchDotfyleButton => ListItem::new(Line::from(vec![
+                Span::styled(
+                    format!(
+                        "    [ 🌐 Search \"{}\" on Dotfyle.com ] ",
+                        truncate_str(app.search_query.trim(), 16)
+                    ),
+                    Style::default()
+                        .fg(Color::Cyan)
                         .add_modifier(Modifier::BOLD),
                 ),
             ])),
@@ -228,6 +240,25 @@ fn draw_left_panel(frame: &mut Frame, app: &App, area: Rect) {
             )),
             Line::from(Span::styled(
                 " Source: https://dotfyle.com/neovim/colorscheme/top",
+                Style::default().fg(Color::Gray),
+            )),
+        ]
+    } else if matches!(app.current_row(), Some(ListRow::SearchDotfyleButton)) {
+        vec![
+            Line::from(Span::styled(
+                format!(
+                    " Press [Enter] to search & fetch \"{}\" live from Dotfyle.com",
+                    app.search_query.trim()
+                ),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(Span::styled(
+                format!(
+                    " Endpoint: https://dotfyle.com/neovim/colorscheme/top?q={}",
+                    app.search_query.trim()
+                ),
                 Style::default().fg(Color::Gray),
             )),
         ]
@@ -406,7 +437,7 @@ fn draw_help_modal(frame: &mut Frame, area: Rect) {
         Line::from("  m                   Load 10 more themes live from Dotfyle"),
         Line::from("  Tab or 1 / 2 / 3    Switch filter: All / Installed / Dotfyle Top"),
         Line::from("  l                   Cycle preview language (AVR C / Rust / Python / C++)"),
-        Line::from("  /                   Search themes by name, repo, or description"),
+        Line::from("  / + query + Enter   Search & fetch themes live from Dotfyle.com"),
         Line::from("  r                   Rollback to previous backup (colorscheme.lua.bak)"),
         Line::from("  ?                   Toggle this help window"),
         Line::from("  q or Esc            Quit application"),

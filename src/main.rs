@@ -18,10 +18,16 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.iter().any(|a| a == "--list") {
         let mut app = App::new();
-        if args.iter().any(|a| a == "--load-more") {
+        if let Some(pos) = args.iter().position(|a| a == "--search") {
+            if let Some(query) = args.get(pos + 1) {
+                app.search_query = query.clone();
+                app.search_dotfyle_online();
+            }
+        } else if args.iter().any(|a| a == "--load-more") {
             app.load_more_themes();
         }
         println!("Active Neovim Colorscheme: {}", app.active_colorscheme);
+        println!("Status: {}", app.status_message);
         println!(
             "{:<5} {:<24} {:<22} {:<12} {:<28}",
             "RANK", "NAME", "COLORSCHEME", "STATUS", "REPO"
@@ -34,7 +40,13 @@ fn main() -> Result<()> {
                     let rank = t
                         .dotfyle_rank
                         .map(|r| format!("#{:02}", r))
-                        .unwrap_or_else(|| "LOC".to_string());
+                        .unwrap_or_else(|| {
+                            if t.installed {
+                                "LOC".to_string()
+                            } else {
+                                "WEB".to_string()
+                            }
+                        });
                     let status = if t.colorscheme == app.active_colorscheme {
                         "ACTIVE"
                     } else if t.installed {
@@ -49,6 +61,12 @@ fn main() -> Result<()> {
                 }
                 ListRow::LoadMoreButton => {
                     println!("      [ + Load More (+10 Themes from Dotfyle) ]");
+                }
+                ListRow::SearchDotfyleButton => {
+                    println!(
+                        "      [ 🌐 Search \"{}\" on Dotfyle.com ]",
+                        app.search_query.trim()
+                    );
                 }
             }
         }
@@ -104,8 +122,20 @@ fn run_app(
                 // 2. Search input mode
                 if app.is_searching {
                     match key.code {
-                        KeyCode::Esc | KeyCode::Enter => {
+                        KeyCode::Esc => {
                             app.is_searching = false;
+                        }
+                        KeyCode::Enter => {
+                            app.is_searching = false;
+                            if !app.search_query.trim().is_empty() {
+                                app.status_is_error = false;
+                                app.status_message = format!(
+                                    "Searching '{}' live on dotfyle.com/neovim/colorscheme/top...",
+                                    app.search_query.trim()
+                                );
+                                terminal.draw(|f| ui::draw(f, app))?;
+                                app.search_dotfyle_online();
+                            }
                         }
                         KeyCode::Backspace => {
                             app.search_query.pop();
@@ -166,19 +196,32 @@ fn run_app(
                         app.show_help = !app.show_help;
                     }
                     KeyCode::Enter | KeyCode::Char('a') => {
-                        if matches!(app.current_row(), Some(ListRow::LoadMoreButton)) {
-                            app.status_message =
-                                "Fetching +10 themes from dotfyle.com/neovim/colorscheme/top...".to_string();
-                            terminal.draw(|f| ui::draw(f, app))?;
-                            app.load_more_themes();
-                        } else {
-                            app.status_message =
-                                "Installing & activating selected theme...".to_string();
-                            terminal.draw(|f| ui::draw(f, app))?;
-                            if let Err(err) = app.apply_selected_theme() {
-                                app.status_is_error = true;
-                                app.status_message = format!("Error: {err}");
+                        match app.current_row() {
+                            Some(ListRow::LoadMoreButton) => {
+                                app.status_message =
+                                    "Fetching +10 themes from dotfyle.com/neovim/colorscheme/top...".to_string();
+                                terminal.draw(|f| ui::draw(f, app))?;
+                                app.load_more_themes();
                             }
+                            Some(ListRow::SearchDotfyleButton) => {
+                                app.status_is_error = false;
+                                app.status_message = format!(
+                                    "Searching '{}' live on dotfyle.com/neovim/colorscheme/top...",
+                                    app.search_query.trim()
+                                );
+                                terminal.draw(|f| ui::draw(f, app))?;
+                                app.search_dotfyle_online();
+                            }
+                            Some(ListRow::Theme(_)) => {
+                                app.status_message =
+                                    "Installing & activating selected theme...".to_string();
+                                terminal.draw(|f| ui::draw(f, app))?;
+                                if let Err(err) = app.apply_selected_theme() {
+                                    app.status_is_error = true;
+                                    app.status_message = format!("Error: {err}");
+                                }
+                            }
+                            None => {}
                         }
                     }
                     KeyCode::Char('r') => {

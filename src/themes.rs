@@ -55,6 +55,35 @@ impl ThemeEntry {
 /// and convert each entry into a `ThemeEntry` with an accurate palette and `:colorscheme` name.
 pub fn fetch_dotfyle_page(page: usize, start_rank: usize, lazy_root: &Path) -> Vec<ThemeEntry> {
     let url = format!("https://dotfyle.com/neovim/colorscheme/top?page={}", page);
+    fetch_dotfyle_url(&url, Some(start_rank), lazy_root)
+}
+
+/// Search colorschemes live on `https://dotfyle.com/neovim/colorscheme/top?q=<query>`
+/// and return all matching `ThemeEntry` items from Dotfyle.
+pub fn search_dotfyle_remote(query: &str, lazy_root: &Path) -> Vec<ThemeEntry> {
+    let encoded = url_encode(query.trim());
+    if encoded.is_empty() {
+        return Vec::new();
+    }
+    let url = format!("https://dotfyle.com/neovim/colorscheme/top?q={}", encoded);
+    fetch_dotfyle_url(&url, None, lazy_root)
+}
+
+fn url_encode(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for b in input.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+            out.push(b as char);
+        } else if b == b' ' {
+            out.push('+');
+        } else {
+            out.push_str(&format!("%{:02X}", b));
+        }
+    }
+    out
+}
+
+fn fetch_dotfyle_url(url: &str, start_rank: Option<usize>, lazy_root: &Path) -> Vec<ThemeEntry> {
     let output = Command::new("curl")
         .args([
             "-fsSL",
@@ -63,8 +92,8 @@ pub fn fetch_dotfyle_page(page: usize, start_rank: usize, lazy_root: &Path) -> V
             "--max-time",
             "8",
             "-A",
-            "Mozilla/5.0 (X11; Linux x86_64) nvim-theme-tui/0.2.0",
-            &url,
+            "Mozilla/5.0 (X11; Linux x86_64) nvim-theme-tui/0.3.0",
+            url,
         ])
         .output();
 
@@ -79,7 +108,11 @@ pub fn fetch_dotfyle_page(page: usize, start_rank: usize, lazy_root: &Path) -> V
     parse_dotfyle_html(&html, start_rank, lazy_root)
 }
 
-fn parse_dotfyle_html(html: &str, start_rank: usize, lazy_root: &Path) -> Vec<ThemeEntry> {
+fn parse_dotfyle_html(
+    html: &str,
+    start_rank: Option<usize>,
+    lazy_root: &Path,
+) -> Vec<ThemeEntry> {
     let mut results = Vec::new();
     let mut seen_repos = HashSet::new();
     let marker = "\\\"owner\\\":\\\"";
@@ -125,7 +158,7 @@ fn parse_dotfyle_html(html: &str, start_rank: usize, lazy_root: &Path) -> Vec<Th
             repo,
             lazy_dir,
             plugin_name_override: plugin_override,
-            dotfyle_rank: Some(current_rank),
+            dotfyle_rank: current_rank,
             stars,
             description: if clean_desc.is_empty() {
                 format!("Neovim colorscheme from github.com/{}/{}", owner, name)
@@ -136,7 +169,9 @@ fn parse_dotfyle_html(html: &str, start_rank: usize, lazy_root: &Path) -> Vec<Th
             installed,
             is_builtin: false,
         });
-        current_rank += 1;
+        if let Some(r) = current_rank.as_mut() {
+            *r += 1;
+        }
     }
 
     results

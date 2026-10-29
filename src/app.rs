@@ -1,5 +1,6 @@
 use crate::themes::{
-    detect_colorscheme_in_plugin_dir, fetch_dotfyle_page, load_initial_themes, ThemeEntry,
+    detect_colorscheme_in_plugin_dir, fetch_dotfyle_page, load_initial_themes,
+    search_dotfyle_remote, ThemeEntry,
 };
 use anyhow::{Context, Result};
 use std::collections::{BTreeMap, HashSet};
@@ -65,6 +66,7 @@ impl PreviewLanguage {
 pub enum ListRow {
     Theme(usize),
     LoadMoreButton,
+    SearchDotfyleButton,
 }
 
 pub struct App {
@@ -171,6 +173,11 @@ impl App {
             self.rows.push(ListRow::LoadMoreButton);
         }
 
+        // When a search query is active, provide a button to search & fetch live from Dotfyle.com
+        if !query.is_empty() {
+            self.rows.push(ListRow::SearchDotfyleButton);
+        }
+
         if self.selected_pos >= self.rows.len() {
             self.selected_pos = self.rows.len().saturating_sub(1);
         }
@@ -194,17 +201,17 @@ impl App {
         self.rows.get(self.selected_pos).copied()
     }
 
-    /// Returns the currently highlighted ThemeEntry (or the last visible theme if cursor is on Load More)
+    /// Returns the currently highlighted ThemeEntry (or the last visible theme if cursor is on an action button)
     pub fn current_theme(&self) -> Option<&ThemeEntry> {
         match self.current_row()? {
             ListRow::Theme(idx) => self.themes.get(idx),
-            ListRow::LoadMoreButton => {
+            ListRow::LoadMoreButton | ListRow::SearchDotfyleButton => {
                 for row in self.rows.iter().rev() {
                     if let ListRow::Theme(idx) = row {
                         return self.themes.get(*idx);
                     }
                 }
-                None
+                self.themes.first()
             }
         }
     }
@@ -278,6 +285,60 @@ impl App {
             "Loaded +10 themes from dotfyle.com/neovim/colorscheme/top (Now showing {} themes).",
             shown_themes
         );
+    }
+
+    /// Searches Dotfyle.com live for `self.search_query` and merges matching themes into the list
+    pub fn search_dotfyle_online(&mut self) {
+        let query = self.search_query.trim().to_string();
+        if query.is_empty() {
+            self.status_is_error = false;
+            self.status_message =
+                "Press [/], type a theme name, and press [Enter] to search on Dotfyle.com."
+                    .to_string();
+            return;
+        }
+
+        // Switch away from Installed tab if active so remote Dotfyle search results are visible
+        if self.tab == FilterTab::Installed {
+            self.tab = FilterTab::All;
+        }
+
+        let fetched = search_dotfyle_remote(&query, &self.lazy_root);
+        let remote_count = fetched.len();
+
+        let mut existing_repos: HashSet<String> =
+            self.themes.iter().map(|t| t.repo.to_lowercase()).collect();
+        let mut added_count = 0usize;
+
+        for item in fetched {
+            if existing_repos.insert(item.repo.to_lowercase()) {
+                self.themes.push(item);
+                added_count += 1;
+            }
+        }
+
+        self.recompute_filter();
+        self.selected_pos = 0;
+
+        let shown_themes = self
+            .rows
+            .iter()
+            .filter(|r| matches!(r, ListRow::Theme(_)))
+            .count();
+
+        if remote_count == 0 && shown_themes == 0 {
+            self.status_is_error = true;
+            self.status_message = format!(
+                "No themes found on Dotfyle.com for '{}'. Press [Esc] to clear search.",
+                query
+            );
+        } else {
+            self.status_is_error = false;
+            self.status_message = format!(
+                "Dotfyle search '{}': {} remote match(es) fetched ({} new added, {} total shown).",
+                query, remote_count, added_count, shown_themes
+            );
+        }
     }
 
     pub fn refresh_installed_states(&mut self) {

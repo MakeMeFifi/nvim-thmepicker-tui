@@ -50,6 +50,10 @@ cargo install nvim-theme-tui --force
 
 ## ✨ Features
 
+- **🔎 Live Dotfyle Search & Fetch (`/ <query> + Enter`):**
+  - Search for **any** Neovim colorscheme on **[dotfyle.com](https://dotfyle.com/neovim/colorscheme/top)** directly from the TUI.
+  - Press **`/`**, type a theme name or keyword (e.g., `monokai`, `solarized`, `ayu`, `poimandres`), and press **`Enter`** (or select `[ 🌐 Search "<query>" on Dotfyle.com ]`) to fetch matching colorschemes live from `https://dotfyle.com/neovim/colorscheme/top?q=<query>`.
+  - Fetched search results immediately get a 24-bit TrueColor live code preview and can be installed + activated in LazyVim with a single **`Enter`** press.
 - **🌐 Live Dotfyle Fetching + "+10 Load More" Pagination:**
   - Fetches top Neovim colorschemes directly from **[dotfyle.com/neovim/colorscheme/top](https://dotfyle.com/neovim/colorscheme/top)** (with automatic offline fallback).
   - Displays the **first 10 themes** initially to keep the interface clean and focused.
@@ -101,10 +105,10 @@ cargo install nvim-theme-tui --force
 | **`m`** | **Load More (+10):** Fetch and display 10 more themes from Dotfyle |
 | **`Tab`** or **`1` / `2` / `3`** | Switch filter tabs: `1: All Themes` / `2: Installed` / `3: Dotfyle Top` |
 | **`l`** | Cycle preview programming language (*Embedded AVR C* → *Rust* → *Python* → *C++20*) |
-| **`/`** | Start interactive search (filters by name, repository, or description) |
+| **`/`** | Start interactive search (filters locally while typing; press **`Enter`** to fetch matching themes live from **Dotfyle.com**) |
 | **`r`** | Rollback: Restore previous backup (`colorscheme.lua.bak`) or LazyVim default |
 | **`?`** | Toggle help modal |
-| **`q`** or **`Esc`** | Quit application |
+| **`q`** or **`Esc`** | Clear active search (`Esc`) or quit application |
 
 ---
 
@@ -118,9 +122,10 @@ cargo build --release
 # Run interactive TUI:
 ./target/release/nvim-theme-tui
 
-# Non-interactive CLI list (first 10 + Load More test):
+# Non-interactive CLI list (first 10 + Load More + Live Dotfyle Search):
 ./target/release/nvim-theme-tui --list
 ./target/release/nvim-theme-tui --list --load-more
+./target/release/nvim-theme-tui --list --search monokai
 ```
 
 ---
