@@ -35,7 +35,6 @@ pub struct ThemeEntry {
     pub plugin_name_override: Option<String>,
     pub dotfyle_rank: Option<usize>,
     pub stars: Option<u32>,
-    pub is_light: bool,
     pub description: String,
     pub palette: ThemePalette,
     pub installed: bool,
@@ -115,7 +114,7 @@ fn parse_dotfyle_html(html: &str, start_rank: usize, lazy_root: &Path) -> Vec<Th
         let clean_desc = unescape_json_str(&short_desc);
         let stars = extract_number_field(chunk, "\\\"stars\\\":");
 
-        let (display_name, colorscheme, lazy_dir, plugin_override, is_light, palette) =
+        let (display_name, colorscheme, lazy_dir, plugin_override, _is_light, palette) =
             resolve_theme_preset(&owner, &name);
 
         let installed = lazy_root.join(&lazy_dir).is_dir();
@@ -128,7 +127,6 @@ fn parse_dotfyle_html(html: &str, start_rank: usize, lazy_root: &Path) -> Vec<Th
             plugin_name_override: plugin_override,
             dotfyle_rank: Some(current_rank),
             stars,
-            is_light,
             description: if clean_desc.is_empty() {
                 format!("Neovim colorscheme from github.com/{}/{}", owner, name)
             } else {
@@ -715,7 +713,6 @@ pub fn append_local_installed_themes(entries: &mut Vec<ThemeEntry>, lazy_root: &
                                 plugin_name_override: None,
                                 dotfyle_rank: None,
                                 stars: None,
-                                is_light: stem.contains("light") || stem.contains("day") || stem.contains("latte"),
                                 description: format!(
                                     "Locally installed colorscheme in ~/.local/share/nvim/lazy/{}",
                                     plugin_dir_name
@@ -792,7 +789,7 @@ fn offline_fallback_themes() -> Vec<ThemeEntry> {
         .iter()
         .enumerate()
         .map(|(i, (owner, name, desc, stars))| {
-            let (display_name, colorscheme, lazy_dir, plugin_override, is_light, palette) =
+            let (display_name, colorscheme, lazy_dir, plugin_override, _is_light, palette) =
                 resolve_theme_preset(owner, name);
             ThemeEntry {
                 display_name,
@@ -802,7 +799,6 @@ fn offline_fallback_themes() -> Vec<ThemeEntry> {
                 plugin_name_override: plugin_override,
                 dotfyle_rank: Some(i + 1),
                 stars: Some(*stars),
-                is_light,
                 description: (*desc).to_string(),
                 palette,
                 installed: false,
