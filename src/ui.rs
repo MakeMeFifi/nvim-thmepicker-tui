@@ -1,10 +1,10 @@
-use crate::app::{App, FilterTab, PreviewLanguage};
+use crate::app::{App, FilterTab, ListRow, PreviewLanguage};
 use crate::themes::{ThemeEntry, ThemePalette};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs, Wrap},
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs, Wrap},
     Frame,
 };
 
@@ -14,47 +14,47 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let vertical = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // Header + Filter Tabs
-            Constraint::Min(14),   // Main Split (Theme List | Live Code Preview)
-            Constraint::Length(3), // Status / Keybindings Footer
+            Constraint::Length(3), // Clean Top Bar
+            Constraint::Min(14),   // Main Split (Themes List | Live Code Preview)
+            Constraint::Length(2), // Compact Status & Keymap Bar
         ])
         .split(root);
 
-    draw_header(frame, app, vertical[0]);
+    draw_top_bar(frame, app, vertical[0]);
 
     let main_split = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .constraints([Constraint::Percentage(38), Constraint::Percentage(62)])
         .split(vertical[1]);
 
     draw_left_panel(frame, app, main_split[0]);
     draw_right_preview(frame, app, main_split[1]);
-    draw_footer(frame, app, vertical[2]);
+    draw_bottom_bar(frame, app, vertical[2]);
 
     if app.show_help {
         draw_help_modal(frame, root);
     }
 }
 
-fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
-    let header_cols = Layout::default()
+fn draw_top_bar(frame: &mut Frame, app: &App, area: Rect) {
+    let cols = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(42),
-            Constraint::Percentage(33),
+            Constraint::Percentage(38),
+            Constraint::Percentage(37),
             Constraint::Percentage(25),
         ])
         .split(area);
 
-    // 1. Title & Active Theme
+    // 1. App Title & Active Colorscheme Pill
     let title_line = Line::from(vec![
         Span::styled(
-            " 🎨 LazyVim Theme Studio ",
+            " nvim-theme-tui ",
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::raw("│ Aktiv: "),
+        Span::styled("│ Active: ", Style::default().fg(Color::DarkGray)),
         Span::styled(
             format!(" {} ", app.active_colorscheme),
             Style::default()
@@ -63,12 +63,13 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
                 .add_modifier(Modifier::BOLD),
         ),
     ]);
-    let title_block = Paragraph::new(title_line).block(
+    let title_box = Paragraph::new(title_line).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(" Neovim / LazyVim "),
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(Color::DarkGray)),
     );
-    frame.render_widget(title_block, header_cols[0]);
+    frame.render_widget(title_box, cols[0]);
 
     // 2. Filter Tabs
     let tab_titles = vec![
@@ -86,30 +87,31 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Filter [Tab / 1-3] "),
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::DarkGray)),
         )
         .style(Style::default().fg(Color::Gray))
         .highlight_style(
             Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         );
-    frame.render_widget(tabs, header_cols[1]);
+    frame.render_widget(tabs, cols[1]);
 
-    // 3. Search Bar
-    let search_border_color = if app.is_searching {
+    // 3. Search Box
+    let search_border = if app.is_searching {
         Color::Yellow
     } else {
         Color::DarkGray
     };
-    let search_text = if app.is_searching {
-        format!("🔎 {}_", app.search_query)
+    let search_str = if app.is_searching {
+        format!(" / {}_", app.search_query)
     } else if app.search_query.is_empty() {
-        "Drücke [/] zum Suchen...".to_string()
+        " Press [/] to filter...".to_string()
     } else {
-        format!("🔎 {}", app.search_query)
+        format!(" / {}", app.search_query)
     };
-    let search = Paragraph::new(search_text)
+    let search = Paragraph::new(search_str)
         .style(Style::default().fg(if app.is_searching || !app.search_query.is_empty() {
             Color::White
         } else {
@@ -118,163 +120,170 @@ fn draw_header(frame: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(search_border_color))
-                .title(" Suche [/] "),
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(search_border)),
         );
-    frame.render_widget(search, header_cols[2]);
+    frame.render_widget(search, cols[2]);
 }
 
 fn draw_left_panel(frame: &mut Frame, app: &App, area: Rect) {
-    let left_chunks = Layout::default()
+    let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(8), Constraint::Length(7)])
+        .constraints([Constraint::Min(8), Constraint::Length(5)])
         .split(area);
 
     let items: Vec<ListItem> = app
-        .filtered_indices
+        .rows
         .iter()
-        .map(|&idx| {
-            let t = &app.themes[idx];
-            let is_active = t.colorscheme == app.active_colorscheme
-                || (app.active_colorscheme == "tokyonight" && t.colorscheme == "tokyonight-moon");
+        .map(|row| match row {
+            ListRow::Theme(idx) => {
+                let t = &app.themes[*idx];
+                let is_active = t.colorscheme == app.active_colorscheme
+                    || (app.active_colorscheme == "tokyonight" && t.colorscheme == "tokyonight-night");
 
-            let mut spans = Vec::new();
-            if is_active {
-                spans.push(Span::styled(
-                    "★ AKTIV ",
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::BOLD),
-                ));
-            } else if t.installed {
-                spans.push(Span::styled(
-                    "✓ Inst. ",
-                    Style::default().fg(Color::Cyan),
-                ));
-            } else {
-                spans.push(Span::styled(
-                    "↓ Cloud ",
-                    Style::default().fg(Color::DarkGray),
-                ));
-            }
+                let rank_str = match t.dotfyle_rank {
+                    Some(r) => format!("#{:02} ", r),
+                    None => "LOC ".to_string(),
+                };
 
-            let mode_icon = if t.is_light { "☀ " } else { "☾ " };
-            spans.push(Span::styled(
-                mode_icon,
-                Style::default().fg(if t.is_light {
-                    Color::Yellow
+                let status_badge = if is_active {
+                    Span::styled(
+                        " ● ACTIVE",
+                        Style::default()
+                            .fg(Color::Green)
+                            .add_modifier(Modifier::BOLD),
+                    )
+                } else if t.installed {
+                    Span::styled(" ✓ Installed", Style::default().fg(Color::Cyan))
                 } else {
-                    Color::Blue
-                }),
-            ));
+                    Span::styled(
+                        format!(" {}", t.stars_formatted()),
+                        Style::default().fg(Color::Yellow),
+                    )
+                };
 
-            spans.push(Span::styled(
-                format!("{:<24}", t.display_name),
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(if is_active {
-                        Modifier::BOLD
-                    } else {
-                        Modifier::empty()
-                    }),
-            ));
-
-            spans.push(Span::styled(
-                format!(" [{}]", t.category_badge()),
-                Style::default().fg(Color::LightMagenta),
-            ));
-
-            ListItem::new(Line::from(spans))
+                ListItem::new(Line::from(vec![
+                    Span::styled(rank_str, Style::default().fg(Color::DarkGray)),
+                    Span::styled(
+                        format!("{:<20}", truncate_str(&t.display_name, 20)),
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(if is_active {
+                                Modifier::BOLD
+                            } else {
+                                Modifier::empty()
+                            }),
+                    ),
+                    status_badge,
+                ]))
+            }
+            ListRow::LoadMoreButton => ListItem::new(Line::from(vec![
+                Span::styled(
+                    "    [ + Load More (+10 from Dotfyle) ] ",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ])),
         })
         .collect();
 
-    let list_title = format!(
-        " Themes ({}/{}) — [↑/↓] Auswahl | [Enter] Aktivieren ",
-        app.filtered_indices.len(),
-        app.themes.len()
-    );
+    let visible_theme_count = app
+        .rows
+        .iter()
+        .filter(|r| matches!(r, ListRow::Theme(_)))
+        .count();
+
+    let list_title = format!(" Themes (Showing {}) ", visible_theme_count);
     let list = List::new(items)
         .block(
             Block::default()
                 .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
                 .title(list_title)
                 .border_style(Style::default().fg(Color::Cyan)),
         )
         .highlight_style(
             Style::default()
-                .bg(Color::Rgb(45, 55, 85))
+                .bg(Color::Rgb(40, 50, 75))
                 .fg(Color::White)
                 .add_modifier(Modifier::BOLD),
         )
-        .highlight_symbol("▶ ");
+        .highlight_symbol(" ▸ ");
 
     let mut state = ListState::default();
-    if !app.filtered_indices.is_empty() {
+    if !app.rows.is_empty() {
         state.select(Some(app.selected_pos));
     }
-    frame.render_stateful_widget(list, left_chunks[0], &mut state);
+    frame.render_stateful_widget(list, chunks[0], &mut state);
 
-    // Metadata Info Card
-    let details_lines = if let Some(t) = app.current_theme() {
-        let status_span = if t.installed {
-            Span::styled(
-                "Lokal installiert (~/.local/share/nvim/lazy)",
-                Style::default().fg(Color::Green),
-            )
+    // Compact 3-line Theme Info Card
+    let info_lines = if matches!(app.current_row(), Some(ListRow::LoadMoreButton)) {
+        vec![
+            Line::from(Span::styled(
+                " Press [Enter] or [m] to fetch 10 more themes from Dotfyle",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(Span::styled(
+                " Source: https://dotfyle.com/neovim/colorscheme/top",
+                Style::default().fg(Color::Gray),
+            )),
+        ]
+    } else if let Some(t) = app.current_theme() {
+        let status_label = if t.installed {
+            Span::styled("Installed", Style::default().fg(Color::Green))
         } else {
-            Span::styled(
-                "Wird bei [Enter] automatisch von GitHub geladen",
-                Style::default().fg(Color::Yellow),
-            )
+            Span::styled("Auto-install on Enter", Style::default().fg(Color::Yellow))
         };
         vec![
             Line::from(vec![
-                Span::styled("Colorscheme: ", Style::default().fg(Color::Gray)),
+                Span::styled(" Repo: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(&t.repo, Style::default().fg(Color::Cyan)),
+                Span::styled("  •  ", Style::default().fg(Color::DarkGray)),
+                status_label,
+            ]),
+            Line::from(vec![
+                Span::styled(" ", Style::default()),
                 Span::styled(
-                    &t.colorscheme,
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
+                    truncate_str(&t.description, 52),
+                    Style::default().fg(Color::Gray),
                 ),
-                Span::raw("   "),
-                Span::styled("GitHub: ", Style::default().fg(Color::Gray)),
-                Span::styled(&t.repo, Style::default().fg(Color::LightBlue)),
-            ]),
-            Line::from(vec![
-                Span::styled("Status:      ", Style::default().fg(Color::Gray)),
-                status_span,
-            ]),
-            Line::from(vec![
-                Span::styled("Info:        ", Style::default().fg(Color::Gray)),
-                Span::styled(&t.description, Style::default().fg(Color::White)),
             ]),
         ]
     } else {
-        vec![Line::from("Kein Theme ausgewählt.")]
+        vec![Line::from(" No theme selected.")]
     };
 
-    let details = Paragraph::new(details_lines)
+    let info_card = Paragraph::new(info_lines)
         .wrap(Wrap { trim: true })
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Theme-Details (dotfyle.com/neovim/colorscheme/top) "),
+                .border_type(BorderType::Rounded)
+                .title(" Details ")
+                .border_style(Style::default().fg(Color::DarkGray)),
         );
-    frame.render_widget(details, left_chunks[1]);
+    frame.render_widget(info_card, chunks[1]);
 }
 
 fn draw_right_preview(frame: &mut Frame, app: &App, area: Rect) {
-    let right_chunks = Layout::default()
+    let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(10), Constraint::Length(5)])
+        .constraints([Constraint::Min(10), Constraint::Length(3)])
         .split(area);
 
     if let Some(theme) = app.current_theme() {
-        draw_code_preview(frame, theme, app.preview_lang, right_chunks[0]);
-        draw_palette_swatches(frame, theme, right_chunks[1]);
+        draw_code_preview(frame, theme, app.preview_lang, chunks[0]);
+        draw_palette_swatches(frame, theme, chunks[1]);
     } else {
-        let empty = Paragraph::new("Keine Vorschau verfügbar.")
-            .block(Block::default().borders(Borders::ALL).title(" Live-Vorschau "));
+        let empty = Paragraph::new("No preview available.").block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .title(" Live Preview "),
+        );
         frame.render_widget(empty, area);
     }
 }
@@ -286,17 +295,18 @@ fn draw_code_preview(
     area: Rect,
 ) {
     let p = &theme.palette;
-
     let code_lines = build_highlighted_snippet(p, lang, &theme.colorscheme);
 
     let title = format!(
-        " Live Code-Vorschau: {} │ Sprache [l]: {} ",
+        " Preview: {} (:colorscheme {}) │ Lang [l]: {} ",
         theme.display_name,
+        theme.colorscheme,
         lang.label()
     );
 
     let block = Block::default()
         .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
         .title(title)
         .style(Style::default().bg(p.bg).fg(p.fg))
         .border_style(Style::default().fg(p.accent));
@@ -310,97 +320,107 @@ fn draw_code_preview(
 
 fn draw_palette_swatches(frame: &mut Frame, theme: &ThemeEntry, area: Rect) {
     let p = &theme.palette;
-
     let swatch_items = [
         ("BG", p.bg),
         ("FG", p.fg),
-        ("Keyword", p.keyword),
+        ("Keyw", p.keyword),
         ("Func", p.func),
-        ("String", p.string),
+        ("Str", p.string),
         ("Type", p.r#type),
-        ("Macro/Reg", p.macro_reg),
-        ("Number", p.number),
-        ("Operator", p.operator),
+        ("Macro", p.macro_reg),
+        ("Num", p.number),
         ("Comment", p.comment),
     ];
 
-    let mut line1 = Vec::new();
-    let mut line2 = Vec::new();
+    let mut spans = Vec::new();
     for (name, color) in swatch_items {
-        line1.push(Span::styled(" ███ ", Style::default().fg(color)));
-        line1.push(Span::raw(" "));
-        line2.push(Span::styled(
-            format!("{:<5}", &name[..name.len().min(5)]),
+        spans.push(Span::styled("██ ", Style::default().fg(color)));
+        spans.push(Span::styled(
+            format!("{}  ", name),
             Style::default().fg(Color::Gray),
         ));
-        line2.push(Span::raw(" "));
     }
 
-    let swatches = Paragraph::new(vec![Line::from(line1), Line::from(line2)])
+    let swatches = Paragraph::new(Line::from(spans))
         .alignment(Alignment::Center)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" 24-Bit TrueColor Farbpalette "),
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::DarkGray)),
         );
     frame.render_widget(swatches, area);
 }
 
-fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
-    let status_color = if app.status_is_error {
-        Color::Red
+fn draw_bottom_bar(frame: &mut Frame, app: &App, area: Rect) {
+    let status_style = if app.status_is_error {
+        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
     } else {
-        Color::Green
+        Style::default().fg(Color::Green)
     };
 
-    let footer = Paragraph::new(Line::from(vec![
-        Span::styled(
-            " STATUS: ",
-            Style::default()
-                .fg(Color::Black)
-                .bg(status_color)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" "),
-        Span::styled(&app.status_message, Style::default().fg(Color::White)),
-        Span::raw("   │ "),
-        Span::styled("[?] Hilfe", Style::default().fg(Color::Yellow)),
-    ]))
-    .block(Block::default().borders(Borders::ALL));
-    frame.render_widget(footer, area);
+    let lines = vec![
+        Line::from(vec![
+            Span::styled(" ", Style::default()),
+            Span::styled(&app.status_message, status_style),
+        ]),
+        Line::from(vec![
+            Span::styled(" ↑/↓", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(" Select  ", Style::default().fg(Color::Gray)),
+            Span::styled("Enter", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+            Span::styled(" Apply  ", Style::default().fg(Color::Gray)),
+            Span::styled("m", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(" Load +10  ", Style::default().fg(Color::Gray)),
+            Span::styled("Tab", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(" Filter  ", Style::default().fg(Color::Gray)),
+            Span::styled("l", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(" Language  ", Style::default().fg(Color::Gray)),
+            Span::styled("/", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(" Search  ", Style::default().fg(Color::Gray)),
+            Span::styled("r", Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
+            Span::styled(" Rollback  ", Style::default().fg(Color::Gray)),
+            Span::styled("?", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(" Help  ", Style::default().fg(Color::Gray)),
+            Span::styled("q", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled(" Quit", Style::default().fg(Color::Gray)),
+        ]),
+    ];
+
+    frame.render_widget(Paragraph::new(lines), area);
 }
 
 fn draw_help_modal(frame: &mut Frame, area: Rect) {
-    let popup_area = centered_rect(65, 65, area);
+    let popup_area = centered_rect(64, 62, area);
     frame.render_widget(Clear, popup_area);
 
     let lines = vec![
         Line::from(Span::styled(
-            "Tastenkürzel — LazyVim Theme Studio",
+            "Keyboard Shortcuts — nvim-theme-tui",
             Style::default()
                 .fg(Color::Cyan)
                 .add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from("  ↑ / ↓ oder j / k    Durch die Themes navigieren (mit Live-Vorschau)"),
-        Line::from("  Enter oder a        Ausgewähltes Theme sicher installieren & aktivieren"),
-        Line::from("  Tab oder 1 / 2 / 3  Zwischen 'Alle', 'Installiert' und 'Dotfyle Top' wechseln"),
-        Line::from("  l                   Code-Sprache der Live-Vorschau wechseln (AVR C / Rust / Python / C++)"),
-        Line::from("  /                   Themes nach Namen, Repo oder Beschreibung filtern"),
-        Line::from("  r                   Rollback: Letztes Backup wiederherstellen"),
-        Line::from("  ?                   Diese Hilfe ein-/ausblenden"),
-        Line::from("  q oder Esc          Programm beenden"),
+        Line::from("  ↑ / ↓ or j / k      Navigate through themes (with live preview)"),
+        Line::from("  Enter or a          Safely install & activate selected theme"),
+        Line::from("  m                   Load 10 more themes live from Dotfyle"),
+        Line::from("  Tab or 1 / 2 / 3    Switch filter: All / Installed / Dotfyle Top"),
+        Line::from("  l                   Cycle preview language (AVR C / Rust / Python / C++)"),
+        Line::from("  /                   Search themes by name, repo, or description"),
+        Line::from("  r                   Rollback to previous backup (colorscheme.lua.bak)"),
+        Line::from("  ?                   Toggle this help window"),
+        Line::from("  q or Esc            Quit application"),
         Line::from(""),
         Line::from(Span::styled(
-            "Sicherheitshinweis (Zero-Breakage Garantie):",
+            "Zero-Breakage Safety Guarantees:",
             Style::default()
                 .fg(Color::Green)
                 .add_modifier(Modifier::BOLD),
         )),
-        Line::from("  • Dieses Tool schreibt ausschließlich in ~/.config/nvim/lua/plugins/colorscheme.lua."),
-        Line::from("  • Vor jedem Speichern wird automatisch ein Backup (colorscheme.lua.bak) angelegt."),
-        Line::from("  • Neue Dotfyle-Themes werden vor dem Aktivieren per git clone nach ~/.local/share/nvim/lazy geladen."),
-        Line::from("  • Ein pcall()-Schutz fällt im Notfall automatisch auf 'tokyonight' zurück."),
+        Line::from("  • Writes only to ~/.config/nvim/lua/plugins/colorscheme.lua."),
+        Line::from("  • Creates an automatic backup (colorscheme.lua.bak) before every change."),
+        Line::from("  • Pre-clones remote plugins into ~/.local/share/nvim/lazy before activating."),
+        Line::from("  • Wraps vim.cmd.colorscheme in pcall() with fallback to 'tokyonight'."),
     ];
 
     let modal = Paragraph::new(lines)
@@ -408,10 +428,22 @@ fn draw_help_modal(frame: &mut Frame, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(Color::Yellow))
-                .title(" Hilfe [? / Esc zum Schließen] "),
+                .title(" Help [? / Esc to close] "),
         );
     frame.render_widget(modal, popup_area);
+}
+
+fn truncate_str(s: &str, max_chars: usize) -> String {
+    let count = s.chars().count();
+    if count <= max_chars {
+        s.to_string()
+    } else {
+        let mut out: String = s.chars().take(max_chars.saturating_sub(1)).collect();
+        out.push('…');
+        out
+    }
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
@@ -467,7 +499,7 @@ fn build_highlighted_snippet<'a>(
         PreviewLanguage::AvrC => vec![
             Line::from(vec![
                 ln(1, false),
-                Span::styled("// Microchip Studio 7.0.2594 — ATmega644 AD/DA Wandler", cm_s),
+                Span::styled("// Microchip Studio 7.0.2594 — ATmega644 ADC Driver", cm_s),
             ]),
             Line::from(vec![
                 ln(2, false),
@@ -507,7 +539,7 @@ fn build_highlighted_snippet<'a>(
                 Span::styled("0xFF", Style::default().fg(p.number).bg(p.bg_highlight)),
                 Span::styled("; ", Style::default().fg(p.fg).bg(p.bg_highlight)),
                 Span::styled(
-                    "// Port A als Ausgang (R-2R Netzwerk)",
+                    "// Configure Port A as R-2R output",
                     Style::default().fg(p.comment).bg(p.bg_highlight),
                 ),
             ]),
@@ -544,30 +576,21 @@ fn build_highlighted_snippet<'a>(
                 Span::styled(");", fg_s),
             ]),
             Line::from(vec![ln(11, false), Span::styled("}", fg_s)]),
-            Line::from(vec![ln(12, false)]),
             Line::from(vec![
-                ln(13, false),
+                ln(12, false),
                 Span::styled("int ", kw),
                 Span::styled("main", fn_s),
                 Span::styled("(", fg_s),
                 Span::styled("void", kw),
-                Span::styled(") {", fg_s),
-            ]),
-            Line::from(vec![
-                ln(14, false),
-                Span::styled("    ", fg_s),
+                Span::styled(") { ", fg_s),
                 Span::styled("adc_init", fn_s),
                 Span::styled("(", fg_s),
                 Span::styled("0", num_s),
-                Span::styled(");", fg_s),
-            ]),
-            Line::from(vec![
-                ln(15, false),
-                Span::styled("    return ", kw),
+                Span::styled("); ", fg_s),
+                Span::styled("return ", kw),
                 Span::styled("0", num_s),
-                Span::styled(";", fg_s),
+                Span::styled("; }", fg_s),
             ]),
-            Line::from(vec![ln(16, false), Span::styled("}", fg_s)]),
         ],
         PreviewLanguage::Rust => vec![
             Line::from(vec![
@@ -607,9 +630,8 @@ fn build_highlighted_snippet<'a>(
                 Span::styled(",", Style::default().fg(p.fg).bg(p.bg_highlight)),
             ]),
             Line::from(vec![ln(8, false), Span::styled("}", fg_s)]),
-            Line::from(vec![ln(9, false)]),
             Line::from(vec![
-                ln(10, false),
+                ln(9, false),
                 Span::styled("pub fn ", kw),
                 Span::styled("sample_adc", fn_s),
                 Span::styled("(raw: ", fg_s),
@@ -619,7 +641,7 @@ fn build_highlighted_snippet<'a>(
                 Span::styled("{", fg_s),
             ]),
             Line::from(vec![
-                ln(11, false),
+                ln(10, false),
                 Span::styled("    let ", kw),
                 Span::styled("voltage_mv ", fg_s),
                 Span::styled("= ", op_s),
@@ -631,20 +653,13 @@ fn build_highlighted_snippet<'a>(
                 Span::styled(";", fg_s),
             ]),
             Line::from(vec![
-                ln(12, false),
-                Span::styled("    println!", reg_s),
-                Span::styled("(", fg_s),
-                Span::styled("\"ADC = {voltage_mv:.2} mV\"", st_s),
-                Span::styled(");", fg_s),
-            ]),
-            Line::from(vec![
-                ln(13, false),
+                ln(11, false),
                 Span::styled("    SensorFrame ", ty_s),
                 Span::styled("{ id: ", fg_s),
                 Span::styled("1", num_s),
                 Span::styled(", voltage_mv }", fg_s),
             ]),
-            Line::from(vec![ln(14, false), Span::styled("}", fg_s)]),
+            Line::from(vec![ln(12, false), Span::styled("}", fg_s)]),
         ],
         PreviewLanguage::Python => vec![
             Line::from(vec![
@@ -684,7 +699,7 @@ fn build_highlighted_snippet<'a>(
             Line::from(vec![
                 ln(9, false),
                 Span::styled("def ", kw),
-                Span::styled("compute_baud_prescaler", fn_s),
+                Span::styled("baud_prescaler", fn_s),
                 Span::styled("(cfg: ", fg_s),
                 Span::styled("DeviceConfig", ty_s),
                 Span::styled(", baud: ", fg_s),
@@ -712,14 +727,9 @@ fn build_highlighted_snippet<'a>(
                 Span::styled("#include ", reg_s),
                 Span::styled("<cstdint>", st_s),
             ]),
+            Line::from(vec![ln(3, false)]),
             Line::from(vec![
-                ln(3, false),
-                Span::styled("#include ", reg_s),
-                Span::styled("<string_view>", st_s),
-            ]),
-            Line::from(vec![ln(4, false)]),
-            Line::from(vec![
-                ln(5, false),
+                ln(4, false),
                 Span::styled("template ", kw),
                 Span::styled("<", op_s),
                 Span::styled("typename ", kw),
@@ -727,7 +737,7 @@ fn build_highlighted_snippet<'a>(
                 Span::styled(">", op_s),
             ]),
             Line::from(vec![
-                ln(6, false),
+                ln(5, false),
                 Span::styled("constexpr ", kw),
                 Span::styled("T ", ty_s),
                 Span::styled("clamp_register", fn_s),
@@ -736,7 +746,7 @@ fn build_highlighted_snippet<'a>(
                 Span::styled("{", fg_s),
             ]),
             Line::from(vec![
-                ln(7, true),
+                ln(6, true),
                 Span::styled(
                     "    return ",
                     Style::default().fg(p.keyword).bg(p.bg_highlight),
@@ -746,12 +756,11 @@ fn build_highlighted_snippet<'a>(
                     Style::default().fg(p.fg).bg(p.bg_highlight),
                 ),
             ]),
-            Line::from(vec![ln(8, false), Span::styled("}", fg_s)]),
+            Line::from(vec![ln(7, false), Span::styled("}", fg_s)]),
         ],
     };
 
     lines.push(Line::from(""));
-    // Simulated Lualine Statusline inside the preview
     lines.push(Line::from(vec![
         Span::styled(
             " NORMAL ",
