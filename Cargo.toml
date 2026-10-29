@@ -1,0 +1,19 @@
+[package]
+name = "nvim-theme-tui"
+version = "0.1.0"
+edition = "2021"
+authors = ["Chris"]
+description = "Interactive Ratatui TUI for browsing, previewing, and safely switching LazyVim / Neovim colorschemes (Installed + Dotfyle Top)"
+license = "MIT"
+readme = "README.md"
+keywords = ["neovim", "lazyvim", "ratatui", "tui", "colorscheme"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "nvim-theme-tui"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+crossterm = "0.28"
+ratatui = "0.29"
